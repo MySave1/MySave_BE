@@ -1,0 +1,43 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://mysave-db.c5aiqyg8cqf9.eu-north-1.rds.amazonaws.com:5432/mysave
+    username: mysave_admin
+    password: qazaz2104
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: idohyeon1231@gmail.com
+    password: qqmc uqmk sjrd dvdh
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  jackson:
+    time-zone: Asia/seoul
+
+kakao:
+  client-id: "621fc658244e0ecc12d668aad841eaf3"
+  redirect-uri: "http://13.60.25.65:8080/api/auth/kakao/callback"
+  auth-url: "https://kauth.kakao.com/oauth/authorize"
+  token-url: "https://kauth.kakao.com/oauth/token"
+  user-info-url: "https://kapi.kakao.com/v2/user/me"
+
+logging:
+  level:
+    org.hibernate.SQL: debug

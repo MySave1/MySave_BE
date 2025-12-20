@@ -16,7 +16,6 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.OffsetDateTime;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -28,55 +27,54 @@ public class KakaoAuthService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    // 1) 로그인 URL 생성
-    public String generateLoginUrl() {
+    // 로그인 URL 생성 (clientRedirectUri 우선 적용)
+    public String generateLoginUrl(String clientRedirectUri) {
+
+        String finalRedirectUri = (clientRedirectUri != null && !clientRedirectUri.isBlank())
+                ? clientRedirectUri
+                : kakaoProperties.getRedirectUri();
+
         return UriComponentsBuilder.fromHttpUrl(kakaoProperties.getAuthUrl())
                 .queryParam("client_id", kakaoProperties.getClientId())
-                .queryParam("redirect_uri", kakaoProperties.getRedirectUri())
+                .queryParam("redirect_uri", finalRedirectUri)
                 .queryParam("response_type", "code")
                 .build()
                 .toUriString();
     }
 
-    // 2~6) 콜백 처리: 토큰 교환, 유저정보, DB저장, JWT발급
-    public LoginResponse handleCallback(String code) {
+    // 콜백 처리
+    public LoginResponse handleCallback(String code, String clientRedirectUri) {
 
-        // 3) code → access_token
-        KakaoTokenResponse tokenResponse = requestAccessToken(code);
+        String finalRedirectUri = (clientRedirectUri != null && !clientRedirectUri.isBlank())
+                ? clientRedirectUri
+                : kakaoProperties.getRedirectUri();
 
-        // 4) access_token → 유저 정보
+        KakaoTokenResponse tokenResponse = requestAccessToken(code, finalRedirectUri);
+
         KakaoUserInfoResponse userInfo = requestUserInfo(tokenResponse.getAccessToken());
 
         Long kakaoId = userInfo.getId();
         String email = userInfo.getEmail();
+        String nickname = userInfo.getNickname();
 
-        // 5) 우리 DB에서 User 조회/생성
-        User user = findOrCreateUser(kakaoId, email);
+        User user = findOrCreateOrUpdateUser(kakaoId, email, nickname);
 
-        // 6) JWT 발급
         String jwt = jwtTokenProvider.generateToken(user.getId());
 
         return new LoginResponse(jwt, user.getId(), user.getName(), user.getEmail());
     }
 
-    private KakaoTokenResponse requestAccessToken(String code) {
+    // 토큰 요청
+    private KakaoTokenResponse requestAccessToken(String code, String redirectUri) {
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("grant_type", "authorization_code");
         params.add("client_id", kakaoProperties.getClientId());
-        params.add("redirect_uri", kakaoProperties.getRedirectUri());
+        params.add("redirect_uri", redirectUri);
         params.add("code", code);
-
-        // 🔥🔥🔥 여기에서 로그 출력해야 함 ============
-        System.out.println("📌 Sending Token Request to Kakao");
-        System.out.println("📌 grant_type = authorization_code");
-        System.out.println("📌 client_id = " + kakaoProperties.getClientId());
-        System.out.println("📌 redirect_uri = " + kakaoProperties.getRedirectUri());
-        System.out.println("📌 code = " + code);
-        System.out.println("📌 token_url = " + kakaoProperties.getTokenUrl());
-        // =========================================
 
         HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(params, headers);
 
@@ -90,7 +88,9 @@ public class KakaoAuthService {
         return response.getBody();
     }
 
+    // 유저 정보 요청
     private KakaoUserInfoResponse requestUserInfo(String accessToken) {
+
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
 
@@ -106,25 +106,31 @@ public class KakaoAuthService {
         return response.getBody();
     }
 
-    private User findOrCreateUser(Long kakaoId, String email) {
+    // 유저 저장 + 업데이트
+    private User findOrCreateOrUpdateUser(Long kakaoId, String email, String nickname) {
 
-        // 이미 있는 유저면 바로 반환
-        Optional<User> existing = userRepository.findByKakaoId(kakaoId);
-        if (existing.isPresent()) {
-            return existing.get();
+        User user = userRepository.findByKakaoId(kakaoId)
+                .orElse(new User());
+
+        if (user.getId() == null) {
+            user.setKakaoId(kakaoId);
+            user.setProvider("kakao");
+            user.setCreatedAt(OffsetDateTime.now());
         }
 
-        // email이 null일 때 대비
         String safeEmail = (email != null)
                 ? email
                 : "kakao-user-" + kakaoId + "@noemail.kakao";
 
-        User user = new User();
-        user.setKakaoId(kakaoId);
         user.setEmail(safeEmail);
-        user.setName("카카오사용자");
-        user.setProvider("kakao");
-        user.setCreatedAt(OffsetDateTime.now());
+
+        if (nickname != null && !nickname.isBlank()) {
+            user.setName(nickname);
+        } else if (user.getName() == null) {
+            user.setName("카카오사용자");
+        }
+
+        user.setUpdatedAt(OffsetDateTime.now());
 
         return userRepository.save(user);
     }

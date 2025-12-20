@@ -1,0 +1,45 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bookmarkdb
+    username: postgres
+    password: 1234 # ← 너 로컬 PostgreSQL 비밀번호로 변경
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        show_sql: true
+
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: idohyeon1231@gmail.com
+    password: qqmc uqmk sjrd dvdh
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  jackson:
+    time-zone:Asia/seoul
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace
+
+kakao:
+  client-id: "621fc658244e0ecc12d668aad841eaf3"
+  redirect-uri: "http://13.60.25.65:8080/api/auth/kakao/callback"
+  auth-url: "https://kauth.kakao.com/oauth/authorize"
+  token-url: "https://kauth.kakao.com/oauth/token"
+  user-info-url: "https://kapi.kakao.com/v2/user/me"

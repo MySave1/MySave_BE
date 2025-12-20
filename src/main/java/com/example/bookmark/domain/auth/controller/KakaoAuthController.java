@@ -3,8 +3,10 @@ package com.example.bookmark.domain.auth.controller;
 import com.example.bookmark.domain.auth.dto.LoginResponse;
 import com.example.bookmark.domain.auth.service.KakaoAuthService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletResponse;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/auth/kakao")
@@ -13,19 +15,30 @@ public class KakaoAuthController {
 
     private final KakaoAuthService kakaoAuthService;
 
-    // 1) 카카오 로그인 URL을 받아가는 엔드포인트
+    // 카카오 로그인 URL 요청 시 -> 프론트 redirect_uri를 받을 수 있도록 변경
     @GetMapping("/login-url")
-    public ResponseEntity<String> getLoginUrl() {
-        String url = kakaoAuthService.generateLoginUrl();
-        return ResponseEntity.ok(url);
+    public String getLoginUrl(
+            @RequestParam(value = "redirect_uri", required = false) String clientRedirectUri
+    ) {
+        return kakaoAuthService.generateLoginUrl(clientRedirectUri);
     }
 
-    // 2) 카카오에서 redirect 해줄 콜백 엔드포인트
-    //   Redirect URI = http://localhost:8080/api/auth/kakao/callback
+    // 카카오 redirect callback -> 프론트로 다시 redirect
     @GetMapping("/callback")
-    public ResponseEntity<LoginResponse> callback(@RequestParam("code") String code) {
-        System.out.println("🔥🔥🔥 콜백 도착! code = " + code);
-        LoginResponse response = kakaoAuthService.handleCallback(code);
-        return ResponseEntity.ok(response);
+    public void callback(
+            @RequestParam("code") String code,
+            @RequestParam(value = "redirect_uri", required = false) String clientRedirectUri,
+            HttpServletResponse response
+    ) throws IOException {
+
+        LoginResponse login = kakaoAuthService.handleCallback(code, clientRedirectUri);
+
+        // callback.html로 리다이렉트
+        response.sendRedirect(
+                clientRedirectUri
+                        + "?token=" + login.getJwt()
+                        + "&userId=" + login.getUserId()
+                        + "&name=" + login.getName()
+        );
     }
 }

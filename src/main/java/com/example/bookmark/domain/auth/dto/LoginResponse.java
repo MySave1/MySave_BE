@@ -6,8 +6,7 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public class LoginResponse {
-
-    private String accessToken;   // 우리 서비스 JWT
+    private String jwt;
     private Long userId;
     private String name;
     private String email;
